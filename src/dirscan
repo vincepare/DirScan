@@ -1,0 +1,67 @@
+#!/usr/bin/env php
+<?php
+/**
+ * DirScan - file system inventory
+ *
+ * @author Vincent Paré (www.finalclap.com)
+ * @copyright © 2015 Vincent Paré
+ * @licence http://opensource.org/licenses/Apache-2.0
+ * @package DirScan
+ * @version 1.0.0 (2015-05-17)
+ */
+
+require __DIR__.'/DirScan.php';
+require __DIR__.'/Reporter.php';
+require __DIR__.'/CliReporter.php';
+
+use Finalclap\DirScan\DirScan;
+use Finalclap\DirScan\CliReporter;
+
+// Help message
+$usage = <<<EOT
+Usage :
+  dirscan [OPTIONS] TARGET
+
+Options :
+  --help, -h        This help message
+  --deep, -d        Explore symbolic links (default : skip)
+  --flat, -f        Do not explore subdirectories
+  --access, -a      Report access time
+  --htime           Report user friendly date nearby unix timestamps
+  --same-device     Explore only directories on the same device as the start directory
+                    Useful on Linux, to ignore special mount points like /sys or /proc
+
+EOT;
+
+// Get settings
+date_default_timezone_set('UTC');
+$options = getopt('hdfa', array('help', 'deep', 'flat', 'access', 'htime', 'same-device'));
+$settings = array(
+    'help'        => isset($options['help'])   || isset($options['h']) ? true : false,
+    'deep'        => isset($options['deep'])   || isset($options['d']) ? true : false,
+    'flat'        => isset($options['flat'])   || isset($options['f']) ? true : false,
+    'access'      => isset($options['access']) || isset($options['a']) ? true : false,
+    'htime'       => isset($options['htime'])       ? true : false,
+    'same-device' => isset($options['same-device']) ? true : false,
+);
+$target = isset($argv[1]) ? end($argv) : null;
+
+// Make target an absolute path to get phar working
+if ($target !== null && !preg_match('#^/#', $target)) {
+    $target = rtrim(getcwd(), '/').'/'.$target;
+}
+
+if ($settings['help']) {
+    echo $usage;
+    die();
+} elseif (!is_dir($target)) {
+    file_put_contents('php://stderr', "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory\n");
+    echo $usage;
+    die(1);
+}
+
+// Scan
+$reporter = new CliReporter($settings);
+$reporter->header($target, $settings, $argv);
+$scanner = new DirScan($settings, $reporter);
+$scanner->scan($target);

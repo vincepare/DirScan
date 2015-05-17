@@ -1,0 +1,403 @@
+#!/usr/bin/env php
+<?php
+/**
+ * DirScan - file system inventory
+ * Legacy version, works on PHP 5.2
+ *
+ * @author Vincent Paré (www.finalclap.com)
+ * @copyright © 2015 Vincent Paré
+ * @licence http://opensource.org/licenses/Apache-2.0
+ * @package DirScan
+ * @version 1.0.0 (2015-05-17)
+ */
+
+// Disabling realpath cache on php <= 5.2
+ini_set('realpath_cache_size', '0');
+ini_set('realpath_cache_ttl', '0');
+
+// Help message
+$usage = <<<EOT
+Usage :
+  dirscan [OPTIONS] TARGET
+
+Options :
+  --help, -h        This help message
+  --deep, -d        Explore symbolic links (default : skip)
+  --flat, -f        Do not explore subdirectories
+  --access, -a      Report access time
+  --htime           Report user friendly date nearby unix timestamps
+  --same-device     Explore only directories on the same device as the start directory
+                    Useful on Linux, to ignore special mount points like /sys or /proc
+
+EOT;
+
+// Get settings
+date_default_timezone_set('UTC');
+if (function_exists('getopt')) {
+    $options = getopt('hdfa');
+} else {
+    file_put_contents('php://stderr', "Unable to read short arguments since getopt is not available on your system."."\n");
+    $options = array();
+}
+
+$settings = array(
+    'help'        => in_array('--help', $argv)   || isset($options['h']) ? true : false,
+    'deep'        => in_array('--deep', $argv)   || isset($options['d']) ? true : false,
+    'flat'        => in_array('--flat', $argv)   || isset($options['f']) ? true : false,
+    'access'      => in_array('--access', $argv) || isset($options['a']) ? true : false,
+    'htime'       => in_array('--htime', $argv)       ? true : false,
+    'same-device' => in_array('--same-device', $argv) ? true : false,
+);
+
+$target = isset($argv[1]) ? end($argv) : null;
+
+if ($settings['help']) {
+    echo $usage;
+    die();
+} elseif (!is_dir($target)) {
+    file_put_contents('php://stderr', "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory\n");
+    echo $usage;
+    die(1);
+}
+
+// Scan
+$reporter = new CliReporter($settings);
+$reporter->header($target, $settings, $argv);
+$scanner = new DirScan($settings, $reporter);
+$scanner->scan($target);
+
+/**
+ * File system scanning class
+ */
+class DirScan
+{
+    // Error codes
+    const ERR_DIR_LOOP = 1000;
+    const ERR_DIR_READ = 1001;
+    const ERR_READLINK = 1002;
+    
+    protected $deep;        // bool Explore symlinks if true (default false)
+    protected $flat;        // bool Do not explore subdirectories if true (default false)
+    protected $reporter;    // Reporter Reporter object to handle DirScan output
+    protected $sameDevice;  // bool Scan only directories on the same device as the start directory (default false)
+    protected $startDevice; // int Device ID of the start directory (provided by lstat)
+    
+    /**
+     * Create a new DirScan object
+     *
+     * @param array $settings List of scan settings
+     * @param Reporter $callback Called for every scanned file system node
+     */
+    public function __construct($settings, Reporter $reporter)
+    {
+        $this->reporter = $reporter;
+        $this->deep = isset($settings['deep']) ? $settings['deep'] : false;
+        $this->flat = isset($settings['flat']) ? $settings['flat'] : false;
+        $this->sameDevice = isset($settings['same-device']) ? $settings['same-device'] : false;
+    }
+    
+    /**
+     * Scan $path and its content if $path is a directory
+     *
+     * @param string $directory Path of a node to scan
+     * @param array $pathstack List of parents directories, used for recursive directory loop detection
+     */
+    public function scan($path, $pathstack = array())
+    {
+        $stat = self::stat($path);
+        call_user_func(array($this->reporter, 'push'), $stat, $this);
+        
+        // Saving start directory device
+        if (empty($pathstack)) {
+            $this->startDevice = $stat['dev'];
+        }
+        
+        // Exit now if path is not a directory or flat is enabled (except for the 1st directory (target))
+        if (!is_dir($path) || ($this->flat && !empty($pathstack))) {
+            return;
+        }
+        
+        // Skip symlink if deep is disabled
+        if (!$this->deep && $stat['type'] === 'link') {
+            return;
+        }
+        
+        // Do not explore direcotry content if it's not on the start device
+        if ($this->sameDevice && $stat['dev'] != $this->startDevice) {
+            return;
+        }
+        
+        // Directory loop prevention
+        if (in_array($stat['realpath'], $pathstack)) {
+            $msg = "Infinite loop : ".$path." (".$stat['uniquepath'].")";
+            call_user_func(array($this->reporter, 'error'), $msg, self::ERR_DIR_LOOP);
+            return;
+        }
+        
+        // Add current directory to path stack
+        $pathstack[] = $stat['realpath'];
+        
+        // Directory content scan
+        $childs = @opendir($path);
+        if ($childs === false) {
+            $error = error_get_last();
+            call_user_func(array($this->reporter, 'error'), $error['message'], self::ERR_DIR_READ);
+            return;
+        }
+        while ($child = readdir($childs)) {
+            // Skip . & ..
+            if ($child === '.' || $child === '..') {
+                continue;
+            }
+            
+            $childPath = rtrim($path, '/').DIRECTORY_SEPARATOR.$child;
+            $this->scan($childPath, $pathstack);
+        }
+        closedir($childs);
+    }
+    
+    /**
+     * Get file system node metadata
+     *
+     * @param string $path File system path of the node
+     * @return array
+     */
+    public static function stat($path)
+    {
+        $lstat = lstat($path);
+        if ($lstat === false) {
+            return false;
+        }
+        $type  = filetype($path);
+        $owner = function_exists('posix_getpwuid') ? posix_getpwuid($lstat['uid']) : null;
+        $group = function_exists('posix_getgrgid') ? posix_getgrgid($lstat['gid']) : null;
+        $uniquepath = self::uniquepath($path);
+        
+        $result = array(
+            'path' => $path,
+            'uniquepath' => $uniquepath,
+            'realpath' => realpath($path),
+            'type'  => $type,
+            'ino'   => $lstat['ino'],
+            'dev'   => $lstat['dev'],
+            'size'  => $lstat['size'],
+            'atime' => $lstat['atime'],
+            'mtime' => $lstat['mtime'],
+            'ctime' => $lstat['ctime'],
+            'mode'  => $lstat['mode'],
+            'uid'   => $lstat['uid'],
+            'gid'   => $lstat['gid'],
+            'owner' => $owner['name'],
+            'group' => $group['name'],
+        );
+        
+        if ($type === 'link') {
+            $target = @readlink($path);
+            if ($target === false) {
+                $error = error_get_last();
+                $msg = $error['message']." (".$uniquepath.")";
+                call_user_func(array($this->reporter, 'error'), $msg, self::ERR_READLINK);
+                return;
+            } else {
+                $result['target'] = readlink($path);
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get a unique path to directory, file and symbolic links
+     * Returns false when path does not exists
+     *
+     * @param string $path
+     * @return string|false
+     */
+    public static function uniquepath($path)
+    {
+        if (!file_exists($path)) {
+            return false;
+        }
+        $info = pathinfo($path);
+        $parent = realpath($info['dirname']);
+        $uniquepath = rtrim($parent, '/').DIRECTORY_SEPARATOR.$info['basename'];
+        return $uniquepath;
+    }
+    
+    /**
+     * This is used to fetch readonly variables
+     *
+     * @param string $attr Attribute name to read
+     * @return mixed Attribute value (or null if attribute does not exists)
+     */
+    public function __get($attr)
+    {
+        return ($attr != "instance" && isset($this->$attr)) ? $this->$attr : null;
+    }
+}
+
+abstract class Reporter
+{
+    /**
+     * DirScan entry handler
+     *
+     * @param array $node Data returned by DirScan::stat
+     * @param DirScan $scanner DirScan object
+     */
+    public function push($node, DirScan $scanner)
+    {
+    }
+    
+    /**
+     * DirScan error handler
+     *
+     * @param string $msg Error message
+     * @param int $code Error code
+     */
+    public function error($msg, $code = null)
+    {
+        trigger_error($msg, E_USER_WARNING);
+    }
+}
+
+/**
+ * Displays scanned files path and attributes (sent by DirScan::scan) on standard output
+ */
+class CliReporter extends Reporter
+{
+    protected $access; // bool Report node access time (default false)
+    protected $htime;  // bool Display human readble date/time beside unix timestamp (default false)
+    protected $typeMapping; // array Short name for file types
+    
+    /**
+     * Set report settings
+     *
+     * @param array $settings List of report settings
+     */
+    public function __construct($settings)
+    {
+        $this->access = isset($settings['access']) ? $settings['access'] : false;
+        $this->htime  = isset($settings['htime'])  ? $settings['htime'] : false;
+        $this->typeMapping = array(
+            'dir' => 'd',
+            'file' => 'f',
+            'link' => 'l'
+        );
+    }
+    
+    /**
+     * Print report header
+     *
+     * @param string $target Target directory
+     * @param array $settings List of report settings
+     * @param array $argv Command line arguments
+     */
+    public function header($target, $settings, $argv)
+    {
+        $targetStat = DirScan::stat($target);
+        
+        echo "time: ".time()."\n";
+        echo "date: ".date('r')."\n";
+        echo "getenv(TZ): ".getenv('TZ')."\n";
+        echo "date_default_timezone_get: ".date_default_timezone_get()."\n";
+        echo "php version: ".phpversion()."\n";
+        echo "cwd: ".getcwd()."\n";
+        echo "target: ".$target." (realpath: ".$targetStat['realpath'].")\n";
+        echo "start device: ".$targetStat['dev']."\n";
+        echo "settings: ".json_encode($settings)."\n";
+        echo "argv: ".json_encode($argv)."\n";
+        echo "=====================================\n";
+        
+        $header = array(
+            'Unique path',
+            'Type',
+            'Size',
+        );
+        
+        $header[] = 'ctime';
+        if ($this->htime) {
+            $header[] = 'Change time';
+        }
+        
+        $header[] = 'mtime';
+        if ($this->htime) {
+            $header[] = 'Modify time';
+        }
+        
+        if ($this->access) {
+            $header[] = 'atime';
+            if ($this->htime) {
+                $header[] = 'Access time';
+            }
+        }
+        
+        $header[] = 'Extended';
+        echo implode("\t", $header)."\n";
+    }
+    
+    /**
+     * Print node data
+     *
+     * @param array $node Data returned by DirScan::stat
+     * @param DirScan $scanner DirScan object
+     */
+    public function push($node, DirScan $scanner)
+    {
+        $type = isset($this->typeMapping[$node['type']]) ? $this->typeMapping[$node['type']] : $node['type'];
+        $perms = substr(sprintf('%o', $node['mode']), -4);
+        if ($this->htime) {
+            $hctime = date('d/m/Y H:i:s', $node['ctime']);
+            $hmtime = date('d/m/Y H:i:s', $node['mtime']);
+            $hatime = date('d/m/Y H:i:s', $node['atime']);
+        }
+        
+        $extended = array();
+        if (isset($node['target'])) {
+            $extended['target'] = $node['target'];
+        }
+        $startDevice = $scanner->startDevice;
+        if ($node['dev'] != $startDevice) {
+            $extended['device'] = $node['dev'];
+        }
+        
+        $row = array(
+            $node['uniquepath'],
+            $type,
+            $node['size'],
+        );
+        
+        $row[] = $node['ctime'];
+        if ($this->htime) {
+            $row[] = $hctime;
+        }
+        
+        $row[] = $node['mtime'];
+        if ($this->htime) {
+            $row[] = $hmtime;
+        }
+        
+        if ($this->access) {
+            $row[] = $node['atime'];
+            if ($this->htime) {
+                $row[] = $hatime;
+            }
+        }
+        
+        if (!empty($extended)) {
+            $row[] = json_encode($extended);
+        }
+        
+        echo implode("\t", $row)."\n";
+    }
+    
+    /**
+     * Print error messages on stderr
+     *
+     * @param string $msg Error message
+     * @param int $code Error code
+     */
+    public function error($msg, $code = null)
+    {
+        file_put_contents('php://stderr', $msg."\n");
+    }
+}
