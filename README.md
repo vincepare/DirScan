@@ -16,9 +16,9 @@ DirScan is bundled with a text reporter, but you can customize its output by cre
 Download dirscan.phar, make it executable (chmod +x dirscan.phar) and rename it if you want. On Linux, store it to `/usr/local/bin` to make it available everywhere :
 
 ```
-wget https://github.com/finalclap/DirScan/releases/download/1.0.0/dirscan.phar
-chmod +x dirscan.phar
-mv dirscan.phar /usr/local/bin/dirscan
+wget -O dirscan https://github.com/finalclap/DirScan/releases/download/1.0.0/dirscan.phar
+chmod +x dirscan
+sudo mv dirscan /usr/local/bin/dirscan
 ```
 
 ### Requirement ###
@@ -41,4 +41,4 @@ Options :
 
 ### About windows ###
 
-DirScan is designed to work a Unix environment (Linux or Mac OS) but you can also use it on Windows. In this case, beware of NTFS junction points and symbolic links that are not handled properly by old php releases (see [readlink](http://php.net/manual/en/function.readlink.php) & [is_link](http://php.net/manual/fr/function.is-link.php)). But you'd better use other tools like [WhereIsIt](http://www.whereisit-soft.com/).
+DirScan is designed to work a Unix environment (Linux or Mac OS) but you can also use it on Windows. In this case, beware of NTFS junction points and symbolic links that are not handled properly by old php releases (see [readlink](http://php.net/manual/en/function.readlink.php) & [is_link](http://php.net/manual/en/function.is-link.php)). But you'd better use other tools like [WhereIsIt](http://www.whereisit-soft.com/).
