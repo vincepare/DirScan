@@ -5,17 +5,19 @@
  *
  * @author Vincent Paré (www.finalclap.com)
  * @copyright © 2015 Vincent Paré
- * @licence http://opensource.org/licenses/Apache-2.0
+ * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.0.0 (2015-05-17)
+ * @version 1.1.0 (2015-06-27)
  */
+
+const DIRSCAN_VERSION = '1.1.0';
 
 require __DIR__.'/DirScan.php';
 require __DIR__.'/Reporter.php';
 require __DIR__.'/CliReporter.php';
 
-use Finalclap\DirScan\DirScan;
-use Finalclap\DirScan\CliReporter;
+use Vincepare\DirScan\DirScan;
+use Vincepare\DirScan\CliReporter;
 
 // Help message
 $usage = <<<EOT
@@ -24,44 +26,73 @@ Usage :
 
 Options :
   --help, -h        This help message
+  --version, -v     Print software version
   --deep, -d        Explore symbolic links (default : skip)
   --flat, -f        Do not explore subdirectories
-  --access, -a      Report access time
-  --htime           Report user friendly date nearby unix timestamps
   --same-device     Explore only directories on the same device as the start directory
                     Useful on Linux, to ignore special mount points like /sys or /proc
+  --access, -a      Report access time
+  --htime, -t       Report user friendly date nearby unix timestamps
+  --perms, -p       Report file permissions
+  --full            Report all properties
+  --format=STRING   Custom reporting format, call with empty string to print format help
 
 EOT;
 
 // Get settings
 date_default_timezone_set('UTC');
-$options = getopt('hdfa', array('help', 'deep', 'flat', 'access', 'htime', 'same-device'));
+$longopts = array('help', 'version', 'deep', 'flat', 'access', 'htime', 'perms', 'same-device', 'full', 'format::');
+$options = getopt('hvdfatp', $longopts);
 $settings = array(
-    'help'        => isset($options['help'])   || isset($options['h']) ? true : false,
-    'deep'        => isset($options['deep'])   || isset($options['d']) ? true : false,
-    'flat'        => isset($options['flat'])   || isset($options['f']) ? true : false,
-    'access'      => isset($options['access']) || isset($options['a']) ? true : false,
-    'htime'       => isset($options['htime'])       ? true : false,
+    'help'        => isset($options['help'])    || isset($options['h']) ? true : false,
+    'version'     => isset($options['version']) || isset($options['v']) ? true : false,
+    'deep'        => isset($options['deep'])    || isset($options['d']) ? true : false,
+    'flat'        => isset($options['flat'])    || isset($options['f']) ? true : false,
+    'access'      => isset($options['access'])  || isset($options['a']) ? true : false,
+    'htime'       => isset($options['htime'])   || isset($options['t']) ? true : false,
+    'perms'       => isset($options['perms'])   || isset($options['p']) ? true : false,
+    'full'        => isset($options['full'])        ? true : false,
     'same-device' => isset($options['same-device']) ? true : false,
+    'format'      => isset($options['format'])      ? $options['format'] : null,
 );
 $target = isset($argv[1]) ? end($argv) : null;
 
 // Make target an absolute path to get phar working
-if ($target !== null && !preg_match('#^/#', $target)) {
-    $target = rtrim(getcwd(), '/').'/'.$target;
+$absPattern = PHP_OS === 'WINNT' ? '#^[A-Z]:\\\\#i' : '#^/#';
+if ($target !== null && !preg_match($absPattern, $target)) {
+    $target = rtrim(getcwd(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$target;
 }
 
+// Format help
+if ($settings['format'] === false) {
+    echo "Format tokens :\n\n";
+    foreach (CliReporter::$propMapping as $key => $val) {
+        echo "  ".str_pad($key, 4)." ".$val."\n";
+    }
+    die(2);
+}
+
+// Help
 if ($settings['help']) {
     echo $usage;
     die();
-} elseif (!is_dir($target)) {
-    file_put_contents('php://stderr', "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory\n");
+}
+
+// Version
+if ($settings['version']) {
+    echo "dirscan ".DIRSCAN_VERSION."\n";
+    die();
+}
+
+// Target check
+if (!is_dir($target)) {
+    fwrite(STDERR, "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory".PHP_EOL);
     echo $usage;
     die(1);
 }
 
 // Scan
 $reporter = new CliReporter($settings);
-$reporter->header($target, $settings, $argv);
+$reporter->header($target, $argv);
 $scanner = new DirScan($settings, $reporter);
 $scanner->scan($target);

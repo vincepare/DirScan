@@ -9,7 +9,7 @@ error_reporting(E_ALL);
 
 // OS check
 if (preg_match('/^(WIN32|WINNT|Windows)$/', PHP_OS)) {
-    file_put_contents('php://stderr', "Please run tests on a Unix environment\n");
+    fwrite(STDERR, "Please run tests on a Unix environment".PHP_EOL);
 }
 
 // Setup test environment

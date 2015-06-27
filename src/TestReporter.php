@@ -6,7 +6,7 @@
  * @package DirScan
  */
 
-namespace Finalclap\DirScan;
+namespace Vincepare\DirScan;
 
 class TestReporter extends Reporter
 {
@@ -25,7 +25,7 @@ class TestReporter extends Reporter
     }
     
     /**
-     * Print error messages on stderr
+     * Print error messages to stderr
      *
      * @param string $msg Error message
      * @param int $code Error code

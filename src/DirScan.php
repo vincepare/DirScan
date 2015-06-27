@@ -6,7 +6,7 @@
  * @package DirScan
  */
 
-namespace Finalclap\DirScan;
+namespace Vincepare\DirScan;
 
 class DirScan
 {

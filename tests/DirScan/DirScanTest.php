@@ -5,7 +5,7 @@
  * @package DirScan
  */
 
-namespace Finalclap\DirScan;
+namespace Vincepare\DirScan;
 
 class DirScanTest extends \PHPUnit_Framework_TestCase
 {
@@ -23,7 +23,7 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
      * Check uniquepath on a symlink
      * uniquepah should not resolve the symlink itself
      *
-     * @covers \Finalclap\DirScan\DirScan::uniquepath
+     * @covers \Vincepare\DirScan\DirScan::uniquepath
      */
     public function testUniquePath()
     {
@@ -35,7 +35,7 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
     /**
      * uniquepath on a non existing path
      *
-     * @covers \Finalclap\DirScan\DirScan::uniquepath
+     * @covers \Vincepare\DirScan\DirScan::uniquepath
      */
     public function testUniquePathNotExists()
     {

@@ -6,10 +6,12 @@
  *
  * @author Vincent Paré (www.finalclap.com)
  * @copyright © 2015 Vincent Paré
- * @licence http://opensource.org/licenses/Apache-2.0
+ * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.0.0 (2015-05-17)
+ * @version 1.1.0-legacy (2015-06-27)
  */
+
+define('DIRSCAN_VERSION', '1.1.0-legacy');
 
 // Disabling realpath cache on php <= 5.2
 ini_set('realpath_cache_size', '0');
@@ -22,47 +24,92 @@ Usage :
 
 Options :
   --help, -h        This help message
+  --version, -v     Print software version
   --deep, -d        Explore symbolic links (default : skip)
   --flat, -f        Do not explore subdirectories
-  --access, -a      Report access time
-  --htime           Report user friendly date nearby unix timestamps
   --same-device     Explore only directories on the same device as the start directory
                     Useful on Linux, to ignore special mount points like /sys or /proc
+  --access, -a      Report access time
+  --htime, -t       Report user friendly date nearby unix timestamps
+  --perms, -p       Report file permissions
+  --full            Report all properties
+  --format=STRING   Custom reporting format, call with empty string to print format help
 
 EOT;
 
-// Get settings
-date_default_timezone_set('UTC');
-if (function_exists('getopt')) {
-    $options = getopt('hdfa');
-} else {
-    file_put_contents('php://stderr', "Unable to read short arguments since getopt is not available on your system."."\n");
-    $options = array();
+// Short options warning
+foreach ($argv as $key => $val) {
+    if (preg_match('#^-[^-]#', $val)) {
+        $errorMsg = "Seems you are using short options. Short options support is disabled in this legacy release because".PHP_EOL
+            ."it doesn't work previous PHP 5.3. Short options will be ignored, please use long options instead,".PHP_EOL
+            ."or use the main release.".PHP_EOL;
+        fwrite(STDERR, $errorMsg);
+        die(3);
+    }
 }
 
+// Get settings
+date_default_timezone_set('UTC');
 $settings = array(
-    'help'        => in_array('--help', $argv)   || isset($options['h']) ? true : false,
-    'deep'        => in_array('--deep', $argv)   || isset($options['d']) ? true : false,
-    'flat'        => in_array('--flat', $argv)   || isset($options['f']) ? true : false,
-    'access'      => in_array('--access', $argv) || isset($options['a']) ? true : false,
+    'help'        => in_array('--help', $argv)        ? true : false,
+    'version'     => in_array('--version', $argv)     ? true : false,
+    'deep'        => in_array('--deep', $argv)        ? true : false,
+    'flat'        => in_array('--flat', $argv)        ? true : false,
+    'access'      => in_array('--access', $argv)      ? true : false,
     'htime'       => in_array('--htime', $argv)       ? true : false,
+    'perms'       => in_array('--perms', $argv)       ? true : false,
+    'full'        => in_array('--full', $argv)        ? true : false,
     'same-device' => in_array('--same-device', $argv) ? true : false,
+    'format'      => null,
 );
+
+// Reading format
+foreach ($argv as $val) {
+    if (preg_match('#^--format(=["\']?(.+)["\']?)?#', $val, $matches)) {
+        $settings['format'] = isset($matches[2]) ? $matches[2] : false;
+        break;
+    }
+}
 
 $target = isset($argv[1]) ? end($argv) : null;
 
+// Make target an absolute path to get phar working
+$absPattern = PHP_OS === 'WINNT' ? '#^[A-Z]:\\\\#i' : '#^/#';
+if ($target !== null && !preg_match($absPattern, $target)) {
+    $target = rtrim(getcwd(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$target;
+}
+
+// Format help
+if ($settings['format'] === false) {
+    echo "Format tokens :\n\n";
+    foreach (CliReporter::$propMapping as $key => $val) {
+        echo "  ".str_pad($key, 4)." ".$val."\n";
+    }
+    die(2);
+}
+
+// Help
 if ($settings['help']) {
     echo $usage;
     die();
-} elseif (!is_dir($target)) {
-    file_put_contents('php://stderr', "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory\n");
+}
+
+// Version
+if ($settings['version']) {
+    echo "dirscan ".DIRSCAN_VERSION."\n";
+    die();
+}
+
+// Target check
+if (!is_dir($target)) {
+    fwrite(STDERR, "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory".PHP_EOL);
     echo $usage;
     die(1);
 }
 
 // Scan
 $reporter = new CliReporter($settings);
-$reporter->header($target, $settings, $argv);
+$reporter->header($target, $argv);
 $scanner = new DirScan($settings, $reporter);
 $scanner->scan($target);
 
@@ -266,8 +313,41 @@ abstract class Reporter
 class CliReporter extends Reporter
 {
     protected $access; // bool Report node access time (default false)
-    protected $htime;  // bool Display human readble date/time beside unix timestamp (default false)
-    protected $typeMapping; // array Short name for file types
+    protected $htime;  // bool Print human readble date/time beside unix timestamp (default false)
+    protected $perms;  // bool Report file permissions (default false)
+    protected $format; // string Custom output format
+    protected $settings; // array Raw report settings
+    
+    /**
+     * Short name for file types
+     */
+    public static $typeMapping = array(
+        'dir' => 'd',
+        'file' => 'f',
+        'link' => 'l',
+    );
+    
+    /**
+     * Properties mapping for custom format
+     */
+    public static $propMapping = array(
+        '%u' => 'Unique path',
+        '%t' => 'Type',
+        '%s' => 'Size',
+        '%c' => 'ctime',
+        '%C' => 'Change time',
+        '%m' => 'mtime',
+        '%M' => 'Modify time',
+        '%a' => 'atime',
+        '%A' => 'Access time',
+        '%p' => 'Permissions',
+        '%o' => 'UID',
+        '%O' => 'Owner',
+        '%g' => 'GID',
+        '%G' => 'Group',
+        '%i' => 'Inode',
+        '%e' => 'Extended',
+    );
     
     /**
      * Set report settings
@@ -278,41 +358,101 @@ class CliReporter extends Reporter
     {
         $this->access = isset($settings['access']) ? $settings['access'] : false;
         $this->htime  = isset($settings['htime'])  ? $settings['htime'] : false;
-        $this->typeMapping = array(
-            'dir' => 'd',
-            'file' => 'f',
-            'link' => 'l'
-        );
+        $this->perms  = isset($settings['perms'])  ? $settings['perms'] : false;
+        $this->format = isset($settings['format']) ? $settings['format'] : null;
+        $this->settings = $settings;
+        
+        // Use format for full report
+        if ($settings['full'] === true) {
+            $this->format = implode(' ', array_keys(self::$propMapping));
+        }
     }
     
     /**
      * Print report header
      *
      * @param string $target Target directory
-     * @param array $settings List of report settings
      * @param array $argv Command line arguments
      */
-    public function header($target, $settings, $argv)
+    public function header($target, $argv)
     {
         $targetStat = DirScan::stat($target);
-        
-        echo "time: ".time()."\n";
-        echo "date: ".date('r')."\n";
+        $header = !empty($this->format) ? $this->getRowFormatHeader($this->format) : $this->getRowHeader();
+        echo "date: ".date('r (U)')."\n";
         echo "getenv(TZ): ".getenv('TZ')."\n";
         echo "date_default_timezone_get: ".date_default_timezone_get()."\n";
+        if (defined('DIRSCAN_VERSION')) {
+            echo "dirscan version: ".DIRSCAN_VERSION."\n";
+        }
         echo "php version: ".phpversion()."\n";
+        echo "uname: ".php_uname()."\n";
         echo "cwd: ".getcwd()."\n";
         echo "target: ".$target." (realpath: ".$targetStat['realpath'].")\n";
         echo "start device: ".$targetStat['dev']."\n";
-        echo "settings: ".json_encode($settings)."\n";
+        echo "settings: ".json_encode($this->settings)."\n";
         echo "argv: ".json_encode($argv)."\n";
         echo "=====================================\n";
+        echo implode("\t", $header)."\n";
+    }
+    
+    /**
+     * Print node data
+     *
+     * @param array $node Data returned by DirScan::stat
+     * @param DirScan $scanner DirScan object
+     */
+    public function push($node, DirScan $scanner)
+    {
+        $meta = $this->getMetadata($node, $scanner);
+        $row = !empty($this->format) ? $this->getRowFormat($this->format, $node, $meta) : $this->getRow($node, $meta);
+        echo implode("\t", $row)."\n";
+    }
+    
+    /**
+     * Return metadata from a node
+     *
+     * @param array $node Data returned by DirScan::stat
+     * @param DirScan $scanner DirScan object
+     * @return array
+     */
+    protected function getMetadata($node, DirScan $scanner)
+    {
+        $meta = array(
+            'type' => isset(self::$typeMapping[$node['type']]) ? self::$typeMapping[$node['type']] : $node['type'],
+            'perms' => substr(sprintf('%o', $node['mode']), -4),
+            'hctime' => date('d/m/Y H:i:s', $node['ctime']),
+            'hmtime' => date('d/m/Y H:i:s', $node['mtime']),
+            'hatime' => date('d/m/Y H:i:s', $node['atime']),
+            'extended' => array(),
+        );
         
+        if (isset($node['target'])) {
+            $meta['extended']['target'] = $node['target'];
+        }
+        
+        if ($node['dev'] != $scanner->startDevice) {
+            $meta['extended']['device'] = $node['dev'];
+        }
+        
+        return $meta;
+    }
+    
+    /**
+     * Return the header row array
+     *
+     * @return array
+     */
+    protected function getRowHeader()
+    {
         $header = array(
             'Unique path',
             'Type',
             'Size',
         );
+        
+        if ($this->perms) {
+            $header[] = 'Permissions';
+        }
         
         $header[] = 'ctime';
         if ($this->htime) {
@@ -332,72 +472,122 @@ class CliReporter extends Reporter
         }
         
         $header[] = 'Extended';
-        echo implode("\t", $header)."\n";
+        return $header;
     }
     
     /**
-     * Print node data
+     * Return the header row array, using custom format
+     *
+     * @param string $format A format string used as row template
+     * @return array
+     */
+    protected function getRowFormatHeader($format)
+    {
+        $header = preg_split('# #', $format);
+        foreach ($header as $key => $val) {
+            $header[$key] = strtr($val, self::$propMapping);
+        }
+        return $header;
+    }
+    
+    /**
+     * Return the row array for a node
      *
      * @param array $node Data returned by DirScan::stat
-     * @param DirScan $scanner DirScan object
+     * @param array $meta Data returned by self::getMetadata
+     * @return array
      */
-    public function push($node, DirScan $scanner)
+    protected function getRow($node, $meta)
     {
-        $type = isset($this->typeMapping[$node['type']]) ? $this->typeMapping[$node['type']] : $node['type'];
-        $perms = substr(sprintf('%o', $node['mode']), -4);
-        if ($this->htime) {
-            $hctime = date('d/m/Y H:i:s', $node['ctime']);
-            $hmtime = date('d/m/Y H:i:s', $node['mtime']);
-            $hatime = date('d/m/Y H:i:s', $node['atime']);
-        }
-        
-        $extended = array();
-        if (isset($node['target'])) {
-            $extended['target'] = $node['target'];
-        }
-        $startDevice = $scanner->startDevice;
-        if ($node['dev'] != $startDevice) {
-            $extended['device'] = $node['dev'];
-        }
-        
         $row = array(
             $node['uniquepath'],
-            $type,
+            $meta['type'],
             $node['size'],
         );
         
+        if ($this->perms) {
+            $row[] = $meta['perms'];
+        }
+        
         $row[] = $node['ctime'];
         if ($this->htime) {
-            $row[] = $hctime;
+            $row[] = $meta['hctime'];
         }
         
         $row[] = $node['mtime'];
         if ($this->htime) {
-            $row[] = $hmtime;
+            $row[] = $meta['hmtime'];
         }
         
         if ($this->access) {
             $row[] = $node['atime'];
             if ($this->htime) {
-                $row[] = $hatime;
+                $row[] = $meta['hatime'];
             }
         }
         
-        if (!empty($extended)) {
-            $row[] = json_encode($extended);
+        if (!empty($meta['extended'])) {
+            $row[] = json_encode($meta['extended']);
         }
         
-        echo implode("\t", $row)."\n";
+        return $row;
     }
     
     /**
-     * Print error messages on stderr
+     * Return the row array for a node, using custom format
+     *
+     * @param string $format A format string used as row template
+     * @param array $node Data returned by DirScan::stat
+     * @param array $meta Data returned by self::getMetadata
+     * @return array
+     */
+    protected function getRowFormat($format, $node, $meta)
+    {
+        $statMapping = array(
+            '%u' => $node['uniquepath'],
+            '%t' => $meta['type'],
+            '%s' => $node['size'],
+            '%c' => $node['ctime'],
+            '%C' => $meta['hctime'],
+            '%m' => $node['mtime'],
+            '%M' => $meta['hmtime'],
+            '%a' => $node['atime'],
+            '%A' => $meta['hatime'],
+            '%p' => $meta['perms'],
+            '%o' => $node['uid'],
+            '%O' => $node['owner'],
+            '%g' => $node['gid'],
+            '%G' => $node['group'],
+            '%i' => $node['ino'],
+            '%e' => empty($meta['extended']) ? '' : json_encode($meta['extended']),
+        );
+        
+        $row = preg_split('# #', $format);
+        foreach ($row as $key => $val) {
+            $row[$key] = strtr($val, $statMapping);
+        }
+        
+        // Trim array
+        $keys = array_reverse(array_keys($row));
+        foreach ($keys as $key) {
+            if (empty($row[$key])) {
+                unset($row[$key]);
+                continue;
+            }
+            break;
+        }
+        
+        return $row;
+    }
+    
+    /**
+     * Print error messages to stderr
      *
      * @param string $msg Error message
      * @param int $code Error code
      */
     public function error($msg, $code = null)
     {
-        file_put_contents('php://stderr', $msg."\n");
+        fwrite(STDERR, $msg.PHP_EOL);
     }
 }

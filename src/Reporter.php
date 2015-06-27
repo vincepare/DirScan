@@ -5,7 +5,7 @@
  * @package DirScan
  */
 
-namespace Finalclap\DirScan;
+namespace Vincepare\DirScan;
 
 abstract class Reporter
 {
