@@ -43,7 +43,13 @@ class DirScan
      */
     public function scan($path, $pathstack = array())
     {
-        $stat = self::stat($path);
+        // Get node metadata
+        $stat = $this->stat($path);
+        if ($stat === false) {
+            $msg = "lstat failed on `".$path."`";
+            call_user_func(array($this->reporter, 'error'), $msg, self::ERR_DIR_LOOP);
+            return;
+        }
         call_user_func(array($this->reporter, 'push'), $stat, $this);
         
         // Saving start directory device
@@ -61,7 +67,7 @@ class DirScan
             return;
         }
         
-        // Do not explore direcotry content if it's not on the start device
+        // Do not explore directory content if it's not on the start device
         if ($this->sameDevice && $stat['dev'] != $this->startDevice) {
             return;
         }
@@ -101,7 +107,7 @@ class DirScan
      * @param string $path File system path of the node
      * @return array
      */
-    public static function stat($path)
+    public function stat($path)
     {
         $lstat = lstat($path);
         if ($lstat === false) {
@@ -135,11 +141,10 @@ class DirScan
             $target = @readlink($path);
             if ($target === false) {
                 $error = error_get_last();
-                $msg = $error['message']." (".$uniquepath.")";
+                $msg = $error['message']." (path: ".$path.", uniquepath: ".$uniquepath.")";
                 call_user_func(array($this->reporter, 'error'), $msg, self::ERR_READLINK);
-                return;
             } else {
-                $result['target'] = readlink($path);
+                $result['target'] = $target;
             }
         }
         
@@ -158,10 +163,16 @@ class DirScan
         if (!file_exists($path)) {
             return false;
         }
+        
+        // Special handling of volume roots on Windows
+        if (PHP_OS === 'WINNT' && preg_match('#^\w:\\\\$#', $path)) {
+            return $path;
+        }
+        
         $info = pathinfo($path);
         clearstatcache(true);
         $parent = realpath($info['dirname']);
-        $uniquepath = rtrim($parent, '/').DIRECTORY_SEPARATOR.$info['basename'];
+        $uniquepath = rtrim($parent, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$info['basename'];
         return $uniquepath;
     }
     

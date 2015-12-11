@@ -7,10 +7,13 @@
  * @copyright © 2015 Vincent Paré
  * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.1.0 (2015-06-27)
+ * @version 1.1.1 (2015-12-11)
  */
 
-const DIRSCAN_VERSION = '1.1.0';
+ini_set('log_errors', 0);
+ini_set('display_errors', 'stderr');
+
+const DIRSCAN_VERSION = '1.1.1';
 
 require __DIR__.'/DirScan.php';
 require __DIR__.'/Reporter.php';

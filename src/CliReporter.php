@@ -74,7 +74,8 @@ class CliReporter extends Reporter
      */
     public function header($target, $argv)
     {
-        $targetStat = DirScan::stat($target);
+        $targetStat = lstat($target);
+        $targetStat['realpath'] = realpath($target);
         $header = !empty($this->format) ? $this->getRowFormatHeader($this->format) : $this->getRowHeader();
         echo "date: ".date('r (U)')."\n";
         echo "getenv(TZ): ".getenv('TZ')."\n";
@@ -198,7 +199,7 @@ class CliReporter extends Reporter
     protected function getRow($node, $meta)
     {
         $row = array(
-            $node['uniquepath'],
+            self::getPath($node),
             $meta['type'],
             $node['size'],
         );
@@ -242,7 +243,7 @@ class CliReporter extends Reporter
     protected function getRowFormat($format, $node, $meta)
     {
         $statMapping = array(
-            '%u' => $node['uniquepath'],
+            '%u' => self::getPath($node),
             '%t' => $meta['type'],
             '%s' => $node['size'],
             '%c' => $node['ctime'],
@@ -279,6 +280,17 @@ class CliReporter extends Reporter
     }
     
     /**
+     * Returns either node uniquepath, or path as failover if uniquepath is not available
+     *
+     * @param array $node Data returned by DirScan::stat
+     * @return string
+     */
+    protected static function getPath($node)
+    {
+        return !empty($node['uniquepath']) ? $node['uniquepath'] : $node['path'].' *UNIQUEPATH_FAILOVER';
+    }
+    
+    /**
      * Print error messages to stderr
      *
      * @param string $msg Error message
@@ -286,6 +298,6 @@ class CliReporter extends Reporter
      */
     public function error($msg, $code = null)
     {
-        fwrite(STDERR, $msg.PHP_EOL);
+        fwrite(STDERR, "[dirscan] ".$msg.PHP_EOL);
     }
 }
