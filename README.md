@@ -16,7 +16,7 @@ DirScan is bundled with a text reporter, but you can customize its output by cre
 Download dirscan.phar, make it executable (chmod +x dirscan.phar) and rename it if you want. On Linux, store it to `/usr/local/bin` to make it available everywhere :
 
 ```
-wget -O dirscan https://github.com/vincepare/DirScan/releases/download/1.1.1/dirscan.phar
+wget -O dirscan https://github.com/vincepare/DirScan/releases/download/1.2.0/dirscan.phar
 chmod +x dirscan
 sudo mv dirscan /usr/local/bin/dirscan
 ```
@@ -27,7 +27,7 @@ Tested on PHP 5.3, 5.4, 5.5 & 5.6. There is also a [legacy release](https://raw.
 ### Usage
 ```
 Usage :
-  dirscan [OPTIONS] TARGET
+  dirscan [OPTIONS] TARGET...
 
 Options :
   --help, -h        This help message

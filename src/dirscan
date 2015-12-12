@@ -7,13 +7,13 @@
  * @copyright © 2015 Vincent Paré
  * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.1.1 (2015-12-11)
+ * @version 1.2.0 (2015-12-12)
  */
 
 ini_set('log_errors', 0);
 ini_set('display_errors', 'stderr');
 
-const DIRSCAN_VERSION = '1.1.1';
+const DIRSCAN_VERSION = '1.2.0';
 
 require __DIR__.'/DirScan.php';
 require __DIR__.'/Reporter.php';
@@ -25,7 +25,7 @@ use Vincepare\DirScan\CliReporter;
 // Help message
 $usage = <<<EOT
 Usage :
-  dirscan [OPTIONS] TARGET
+  dirscan [OPTIONS] TARGET...
 
 Options :
   --help, -h        This help message
@@ -58,12 +58,23 @@ $settings = array(
     'same-device' => isset($options['same-device']) ? true : false,
     'format'      => isset($options['format'])      ? $options['format'] : null,
 );
-$target = isset($argv[1]) ? end($argv) : null;
+
+// Get targets
+$targets = array();
+foreach ($argv as $key => $val) {
+    // Ignore first argument (script) and options
+    if ($key == 0 || preg_match('#^--?\w+#', $val)) {
+        continue;
+    }
+    $targets[] = $val;
+}
 
 // Make target an absolute path to get phar working
 $absPattern = PHP_OS === 'WINNT' ? '#^[A-Z]:\\\\#i' : '#^/#';
-if ($target !== null && !preg_match($absPattern, $target)) {
-    $target = rtrim(getcwd(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$target;
+foreach ($targets as $key => $target) {
+    if ($target !== null && !preg_match($absPattern, $target)) {
+        $targets[$key] = rtrim(getcwd(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$target;
+    }
 }
 
 // Format help
@@ -88,14 +99,26 @@ if ($settings['version']) {
 }
 
 // Target check
-if (!is_dir($target)) {
-    fwrite(STDERR, "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory".PHP_EOL);
+if (empty($targets)) {
+    fwrite(STDERR, "No target".PHP_EOL);
     echo $usage;
+    die(2);
+}
+$badTarget = 0;
+foreach ($targets as $key => $target) {
+    if (!is_dir($target)) {
+        fwrite(STDERR, "TARGET".(!empty($target) ? ' ('.$target.') ' : ' ')."is not a directory".PHP_EOL);
+        $badTarget++;
+    }
+}
+if ($badTarget > 0) {
     die(1);
 }
 
 // Scan
 $reporter = new CliReporter($settings);
-$reporter->header($target, $argv);
+$reporter->header($targets, $argv);
 $scanner = new DirScan($settings, $reporter);
-$scanner->scan($target);
+foreach ($targets as $key => $target) {
+    $scanner->scan($target);
+}

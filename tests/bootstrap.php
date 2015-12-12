@@ -15,7 +15,7 @@ if (preg_match('/^(WIN32|WINNT|Windows)$/', PHP_OS)) {
 // Setup test environment
 $wd = getcwd();
 chdir(__DIR__);
-if (!is_executable('setup.sh') && !chmod('setup.sh', 0555)) {
+if (!is_executable('setup.sh') && !chmod('setup.sh', 0755)) {
     trigger_error("Please make setup.sh executable", E_USER_ERROR);
 }
 exec('./setup.sh', $output, $status);

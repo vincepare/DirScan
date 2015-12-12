@@ -69,13 +69,11 @@ class CliReporter extends Reporter
     /**
      * Print report header
      *
-     * @param string $target Target directory
+     * @param array $targets List of target directories
      * @param array $argv Command line arguments
      */
-    public function header($target, $argv)
+    public function header($targets, $argv)
     {
-        $targetStat = lstat($target);
-        $targetStat['realpath'] = realpath($target);
         $header = !empty($this->format) ? $this->getRowFormatHeader($this->format) : $this->getRowHeader();
         echo "date: ".date('r (U)')."\n";
         echo "getenv(TZ): ".getenv('TZ')."\n";
@@ -86,10 +84,14 @@ class CliReporter extends Reporter
         echo "php version: ".phpversion()."\n";
         echo "uname: ".php_uname()."\n";
         echo "cwd: ".getcwd()."\n";
-        echo "target: ".$target." (realpath: ".$targetStat['realpath'].")\n";
-        echo "start device: ".$targetStat['dev']."\n";
         echo "settings: ".json_encode($this->settings)."\n";
         echo "argv: ".json_encode($argv)."\n";
+        echo "target".(count($targets) > 1 ? "s" : "").": "."\n";
+        foreach ($targets as $key => $target) {
+            $targetStat = lstat($target);
+            $targetStat['realpath'] = realpath($target);
+            echo sprintf(" - %s (realpath: %s, device: %s)\n", $target, $targetStat['realpath'], $targetStat['dev']);
+        }
         echo "=====================================\n";
         echo implode("\t", $header)."\n";
     }
