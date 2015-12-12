@@ -64,6 +64,36 @@ Format tokens to customize output (`--format`) :
   %e   Extended
 ```
 
+### Programmatic use
+Although dirscan is released as a command line tool, you can also use its internal `DirScan` class as a file system iterator. Dirscan is available as a composer package :
+```
+composer require vincepare/dirscan
+```
+
+##### How to use
+```php
+require 'vendor/autoload.php';
+
+use Vincepare\DirScan\DirScan;
+use Vincepare\DirScan\Reporter;
+
+class MyReporter extends Reporter
+{
+    public $files = [];
+    
+    public function push($node, DirScan $scanner)
+    {
+        $this->files[] = $node['path'];
+    }
+}
+
+$settings = ['flat' => true];
+$reporter = new MyReporter();
+$scanner = new DirScan($settings, $reporter);
+$scanner->scan('/tmp');
+print_r($reporter->files);
+```
+
 ### About windows
 
 DirScan is designed to work on a Unix environment (Linux or Mac OS) but you can also use it on Windows. In this case, beware of NTFS junction points and symbolic links that are not handled properly by old php releases (see [readlink](http://php.net/manual/en/function.readlink.php) & [is_link](http://php.net/manual/en/function.is-link.php)). But you'd better use other tools like [WhereIsIt](http://www.whereisit-soft.com/).
