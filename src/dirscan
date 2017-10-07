@@ -3,17 +3,17 @@
 /**
  * DirScan - file system inventory
  *
- * @author Vincent Paré (www.finalclap.com)
+ * @author Vincent Paré
  * @copyright © 2015 Vincent Paré
  * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.2.0 (2015-12-12)
+ * @version 1.2.1
  */
 
 ini_set('log_errors', 0);
 ini_set('display_errors', 'stderr');
 
-const DIRSCAN_VERSION = '1.2.0';
+const DIRSCAN_VERSION = '1.2.1';
 
 require __DIR__.'/DirScan.php';
 require __DIR__.'/Reporter.php';

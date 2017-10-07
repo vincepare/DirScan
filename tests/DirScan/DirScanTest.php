@@ -113,11 +113,22 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
             '/wings/seaplane/canadair',
             '/wings/seaplane/canadair/fuel.txt',
             '/wings/seaplane/fuel.txt',
+            '/trickynames',
+            '/trickynames/_',
+            '/trickynames/_/fuel.txt',
+            '/trickynames/0',
+            '/trickynames/0/fuel.txt',
+            '/trickynames/null',
+            '/trickynames/null/fuel.txt',
+            '/trickynames/false',
+            '/trickynames/false/fuel.txt',
+            '/trickynames/ ',
+            '/trickynames/ /fuel.txt',
         );
         sort($expected);
         
         $this->assertEmpty($reporter->errorStack);
-        $this->assertCount(29, $reporter->pushStack);
+        $this->assertCount(40, $reporter->pushStack);
         $this->assertSame($expected, $observed);
     }
     
@@ -157,7 +168,7 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
         $scanner = new DirScan($settings, $reporter);
         $scanner->scan($this->sandbox);
         $this->assertCount(2, $reporter->errorStack);
-        $this->assertCount(35, $reporter->pushStack);
+        $this->assertCount(46, $reporter->pushStack);
         $this->assertStringStartsWith('Infinite loop :', $reporter->errorStack[0]['msg']);
         $this->assertStringStartsWith('Infinite loop :', $reporter->errorStack[1]['msg']);
     }

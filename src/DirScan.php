@@ -89,7 +89,7 @@ class DirScan
             call_user_func(array($this->reporter, 'error'), $error['message'], self::ERR_DIR_READ);
             return;
         }
-        while ($child = readdir($childs)) {
+        while (false !== ($child = readdir($childs))) {
             // Skip . & ..
             if ($child === '.' || $child === '..') {
                 continue;

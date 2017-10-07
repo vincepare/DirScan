@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Setup test environnement on Linux
 
 if [ ! -d sandbox ]; then
@@ -16,6 +16,11 @@ mkdir -p wheels/bike/{sidecar,"mountain bike"}
 mkdir -p wings/{plane,helicopter,seaplane}
 mkdir -p wings/seaplane/canadair
 mkdir -p hulls/{boat,"jet ski"}
+mkdir -p trickynames/_
+mkdir -p trickynames/0
+mkdir -p trickynames/null
+mkdir -p trickynames/false
+mkdir -p trickynames/' '
 
 # Creating files
 echo "fuel" > fuel.txt
@@ -25,6 +30,7 @@ cp -p fuel.txt wheels/car/off-road/buggy
 cp -p fuel.txt wheels/car/off-road/"monster truck"
 cp -p fuel.txt wings/seaplane
 cp -p fuel.txt wings/seaplane/canadair
+find trickynames/ -mindepth 1 -maxdepth 1 -type d -exec cp -p fuel.txt {} \;
 rm fuel.txt
 
 # Creating symlinks

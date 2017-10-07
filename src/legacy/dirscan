@@ -4,17 +4,17 @@
  * DirScan - file system inventory
  * Legacy version, works on PHP 5.2
  *
- * @author Vincent Paré (www.finalclap.com)
+ * @author Vincent Paré
  * @copyright © 2015 Vincent Paré
  * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.2.0-legacy (2015-12-12)
+ * @version 1.2.1-legacy
  */
 
 ini_set('log_errors', 0);
 ini_set('display_errors', 'stderr');
 
-define('DIRSCAN_VERSION', '1.2.0-legacy');
+define('DIRSCAN_VERSION', '1.2.1-legacy');
 
 // Disabling realpath cache on php <= 5.2
 ini_set('realpath_cache_size', '0');
@@ -222,7 +222,7 @@ class DirScan
             call_user_func(array($this->reporter, 'error'), $error['message'], self::ERR_DIR_READ);
             return;
         }
-        while ($child = readdir($childs)) {
+        while (false !== ($child = readdir($childs))) {
             // Skip . & ..
             if ($child === '.' || $child === '..') {
                 continue;

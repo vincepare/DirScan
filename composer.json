@@ -2,14 +2,12 @@
     "name": "vincepare/dirscan",
     "description": "File system scanner",
     "type": "project",
-    "time": "2015-12-12",
     "license": "Apache-2.0",
     "keywords": ["filesystem","iterator","reporting"],
     "homepage": "https://github.com/vincepare/DirScan",
     "authors": [
         {
             "name": "Vincent Paré",
-            "email": "opensource@finalclap.com",
             "homepage": "http://www.finalclap.com/"
         }
     ],
