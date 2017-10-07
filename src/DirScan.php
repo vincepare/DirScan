@@ -160,7 +160,7 @@ class DirScan
      */
     public static function uniquepath($path)
     {
-        if (!file_exists($path)) {
+        if (!file_exists($path) && !is_link($path)) {
             return false;
         }
         

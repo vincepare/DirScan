@@ -54,6 +54,16 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
     }
     
     /**
+     * uniquepath on a broken symlink
+     *
+     * @covers \Vincepare\DirScan\DirScan::uniquepath
+     */
+    public function testUniqueBrokenSymlink()
+    {
+        $this->assertNotEquals(false, DirScan::uniquepath($this->sandbox.'/ln-broken'));
+    }
+    
+    /**
      * Directory exploration
      */
     public function testDirectory()
@@ -124,11 +134,12 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
             '/trickynames/false/fuel.txt',
             '/trickynames/ ',
             '/trickynames/ /fuel.txt',
+            '/ln-broken',
         );
         sort($expected);
         
         $this->assertEmpty($reporter->errorStack);
-        $this->assertCount(40, $reporter->pushStack);
+        $this->assertCount(41, $reporter->pushStack);
         $this->assertSame($expected, $observed);
     }
     
@@ -168,7 +179,7 @@ class DirScanTest extends \PHPUnit_Framework_TestCase
         $scanner = new DirScan($settings, $reporter);
         $scanner->scan($this->sandbox);
         $this->assertCount(2, $reporter->errorStack);
-        $this->assertCount(46, $reporter->pushStack);
+        $this->assertCount(47, $reporter->pushStack);
         $this->assertStringStartsWith('Infinite loop :', $reporter->errorStack[0]['msg']);
         $this->assertStringStartsWith('Infinite loop :', $reporter->errorStack[1]['msg']);
     }

@@ -38,6 +38,7 @@ ln -sv "$PWD/wheels/car/convertible/fuel.txt" ln-file-absolute-fuel
 ln -sv wheels/car/convertible/fuel.txt ln-file-relative-fuel
 ln -sv "$PWD/wings/seaplane" hulls/ln-dir-absolute-seaplane
 (cd hulls && ln -sv ../wings/seaplane ln-dir-relative-seaplane)
+ln -sv /no/target/at/all ln-broken
 
 # Directory loop symlinks
 ln -sv "$PWD/wheels" wheels/bike/sidecar/ln-dir-loop-absolute
