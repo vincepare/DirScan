@@ -77,6 +77,8 @@ class CliReporter extends Reporter
         $header = !empty($this->format) ? $this->getRowFormatHeader($this->format) : $this->getRowHeader();
         echo "date: ".date('r (U)')."\n";
         echo "getenv(TZ): ".getenv('TZ')."\n";
+        echo getenv('DIRSCAN_CHROOT') ? "DIRSCAN_CHROOT: " . getenv('DIRSCAN_CHROOT') . "\n" : "";
+        echo getenv('DIRSCAN_PWD') ? "DIRSCAN_PWD: " . getenv('DIRSCAN_PWD') . "\n" : "";
         echo "date_default_timezone_get: ".date_default_timezone_get()."\n";
         if (defined('DIRSCAN_VERSION')) {
             echo "dirscan version: ".DIRSCAN_VERSION."\n";

@@ -8,13 +8,13 @@
  * @copyright © 2015 Vincent Paré
  * @license http://opensource.org/licenses/Apache-2.0
  * @package DirScan
- * @version 1.2.1-legacy
+ * @version 1.3.0-legacy
  */
 
 ini_set('log_errors', 0);
 ini_set('display_errors', 'stderr');
 
-define('DIRSCAN_VERSION', '1.2.1-legacy');
+define('DIRSCAN_VERSION', '1.3.0-legacy');
 
 // Disabling realpath cache on php <= 5.2
 ini_set('realpath_cache_size', '0');
@@ -39,6 +39,15 @@ Options :
   --format=STRING   Custom reporting format, call with empty string to print format help
 
 EOT;
+
+// Handling chroot mode
+if (getenv('DIRSCAN_CHROOT')) {
+    chroot(getenv('DIRSCAN_CHROOT'));
+}
+
+if (getenv('DIRSCAN_PWD')) {
+    chdir(getenv('DIRSCAN_PWD'));
+}
 
 // Short options warning
 foreach ($argv as $key => $val) {
@@ -415,6 +424,8 @@ class CliReporter extends Reporter
         $header = !empty($this->format) ? $this->getRowFormatHeader($this->format) : $this->getRowHeader();
         echo "date: ".date('r (U)')."\n";
         echo "getenv(TZ): ".getenv('TZ')."\n";
+        echo getenv('DIRSCAN_CHROOT') ? "DIRSCAN_CHROOT: " . getenv('DIRSCAN_CHROOT') . "\n" : "";
+        echo getenv('DIRSCAN_PWD') ? "DIRSCAN_PWD: " . getenv('DIRSCAN_PWD') . "\n" : "";
         echo "date_default_timezone_get: ".date_default_timezone_get()."\n";
         if (defined('DIRSCAN_VERSION')) {
             echo "dirscan version: ".DIRSCAN_VERSION."\n";
